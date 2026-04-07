@@ -5,6 +5,7 @@ import '../services/api_service.dart';
 import '../un_authorized/api_handler.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import '../widgets/app_drawer.dart';
+import 'package:carousel_slider/carousel_slider.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -21,6 +22,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   bool isConnected = true;
   bool isLoading = false;
+
+  /// 🔥 Hero Images
+  final List<String> images = [
+    "https://picsum.photos/800/300?1",
+    "https://picsum.photos/800/300?2",
+    "https://picsum.photos/800/300?3",
+  ];
 
   @override
   void initState() {
@@ -82,16 +90,107 @@ class _DashboardScreenState extends State<DashboardScreen> {
     }
   }
 
-  /// 🔥 Summary Card
-  Widget summaryCard(String title, int count, IconData icon, Color color) {
+  /// 🎞 Hero Section
+  Widget heroSection() {
+    return CarouselSlider(
+      options: CarouselOptions(
+        height: 180,
+        autoPlay: true,
+        enlargeCenterPage: true,
+        viewportFraction: 1,
+      ),
+      items: images.map((img) {
+        return ClipRRect(
+          borderRadius: BorderRadius.circular(15),
+          child: Image.network(
+            img,
+            fit: BoxFit.cover,
+            width: double.infinity,
+          ),
+        );
+      }).toList(),
+    );
+  }
+
+  /// 📢 Notice Section
+  Widget noticeSection() {
+    DateTime now = DateTime.now();
+
     return Card(
-      elevation: 6,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
-      child: ListTile(
-        leading: Icon(icon, size: 40, color: color),
-        title: Text(title,
-            style: const TextStyle(fontWeight: FontWeight.bold)),
-        subtitle: Text("Total: $count"),
+      elevation: 5,
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text("📢 Notices",
+                style: TextStyle(
+                    fontSize: 18, fontWeight: FontWeight.bold)),
+
+            const SizedBox(height: 8),
+
+            Text("Date: ${now.day}-${now.month}-${now.year}"),
+            Text("Weekday: ${getWeekday(now.weekday)}"),
+
+            const Divider(),
+
+            const Text("• Exam starts next week"),
+            const Text("• New admission open"),
+            const Text("• Holiday on Friday"),
+          ],
+        ),
+      ),
+    );
+  }
+
+  String getWeekday(int day) {
+    const days = [
+      "Monday",
+      "Tuesday",
+      "Wednesday",
+      "Thursday",
+      "Friday",
+      "Saturday",
+      "Sunday"
+    ];
+    return days[day - 1];
+  }
+
+  /// 📊 Grid Dashboard
+  Widget dashboardGrid() {
+    return GridView.count(
+      crossAxisCount: 2,
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      crossAxisSpacing: 10,
+      mainAxisSpacing: 10,
+      children: [
+        gridItem("Users", users.length, Icons.person, Colors.blue),
+        gridItem("Students", students.length, Icons.school, Colors.green),
+        gridItem("Teachers", teachers.length, Icons.people, Colors.orange),
+        gridItem("Classes", classes.length, Icons.class_, Colors.purple),
+        gridItem("Attendance", 120, Icons.check_circle, Colors.red),
+      ],
+    );
+  }
+
+  Widget gridItem(String title, int count, IconData icon, Color color) {
+    return Container(
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(15),
+      ),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(icon, size: 40, color: color),
+          const SizedBox(height: 10),
+          Text(title,
+              style: const TextStyle(fontWeight: FontWeight.bold)),
+          Text("$count",
+              style: TextStyle(fontSize: 18, color: color)),
+        ],
       ),
     );
   }
@@ -104,7 +203,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
         centerTitle: true,
       ),
 
-      /// ✅ Drawer added
       drawer: const AppDrawer(),
 
       body: RefreshIndicator(
@@ -116,19 +214,28 @@ class _DashboardScreenState extends State<DashboardScreen> {
               const Text("No Internet Connection",
                   style: TextStyle(color: Colors.red)),
 
+            heroSection(),
+
+            const SizedBox(height: 15),
+
+            noticeSection(),
+
+            const SizedBox(height: 15),
+
             if (isLoading)
               const Center(child: CircularProgressIndicator()),
 
-            const SizedBox(height: 10),
+            dashboardGrid(),
 
-            /// 📊 Summary Cards
-            summaryCard("Users", users.length, Icons.person, Colors.blue),
-            summaryCard(
-                "Students", students.length, Icons.school, Colors.green),
-            summaryCard(
-                "Teachers", teachers.length, Icons.people, Colors.orange),
-            summaryCard(
-                "Classes", classes.length, Icons.class_, Colors.purple),
+            const SizedBox(height: 20),
+
+            /// ➕ Extra section
+            Card(
+              child: ListTile(
+                leading: const Icon(Icons.info, color: Colors.blue),
+                title: const Text("More Features Coming Soon"),
+              ),
+            ),
           ],
         ),
       ),
