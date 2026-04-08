@@ -49,7 +49,7 @@ class AppDrawer extends StatelessWidget {
             MaterialPageRoute(builder: (_) => const ProfileScreen()),
           );
         }else if (endpoint == "students") {
-          Navigator.pushReplacement(
+          Navigator.push(
             context,
             MaterialPageRoute(
               builder: (_) =>
@@ -57,7 +57,7 @@ class AppDrawer extends StatelessWidget {
             ),
           );
         }else if (endpoint == "teachers") {
-          Navigator.pushReplacement(
+          Navigator.push(
             context,
             MaterialPageRoute(
               builder: (_) =>
@@ -65,7 +65,7 @@ class AppDrawer extends StatelessWidget {
             ),
           );
         }else if (endpoint == "classes") {
-          Navigator.pushReplacement(
+          Navigator.push(
             context,
             MaterialPageRoute(
               builder: (_) =>
@@ -73,7 +73,7 @@ class AppDrawer extends StatelessWidget {
             ),
           );
         }else {
-          Navigator.pushReplacement(
+          Navigator.push(
             context,
             MaterialPageRoute(
               builder: (_) =>
