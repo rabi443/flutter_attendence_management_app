@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import '../screens/login_screen.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+// import '../screens/login_screen.dart';
+// import 'package:shared_preferences/shared_preferences.dart';
 import '../services/api_service.dart';
 import '../un_authorized/api_handler.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
@@ -40,8 +40,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
   @override
   void initState() {
     super.initState();
-    checkInternet();
-    fetchDashboardData();
+    init();
+  }
+
+  Future<void> init() async {
+    await checkInternet();
+    if (isConnected) {
+      await fetchDashboardData();
+    }
   }
 
   /// 🌐 Internet check
@@ -78,6 +84,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
     try {
       final data =
       await handleApi(context, () => ApiService.getDashboardData());
+
+      if (data == null) return; // 🔥 FIX
 
       setState(() {
         users = data['users'] ?? [];

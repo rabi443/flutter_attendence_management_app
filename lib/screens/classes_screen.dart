@@ -41,8 +41,14 @@ class _ClassesScreenState extends State<ClassesScreen> {
   @override
   void initState() {
     super.initState();
-    checkInternet();
-    fetchData();
+    init();
+  }
+
+  Future<void> init() async {
+    await checkInternet();
+    if (isConnected) {
+      await fetchData();
+    }
   }
 
   Future<void> checkInternet() async {
@@ -142,7 +148,7 @@ class _ClassesScreenState extends State<ClassesScreen> {
     }
 
     int parsedId = int.parse(id.toString());
-    bool success = false;
+    bool? success; // 🔥 FIX (nullable)
 
     try {
       success = await handleApi(
@@ -155,11 +161,13 @@ class _ClassesScreenState extends State<ClassesScreen> {
 
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-          content:
-          Text(success ? "Deleted successfully" : "Failed to delete")),
+        content: Text(
+          success == true ? "Deleted successfully" : "Failed to delete",
+        ),
+      ),
     );
 
-    if (success) fetchData();
+    if (success == true) fetchData();
   }
 
   void openForm({Map<String, dynamic>? item}) {
@@ -206,7 +214,8 @@ class _ClassesScreenState extends State<ClassesScreen> {
               if (formKey.currentState!.validate()) {
                 formKey.currentState!.save();
 
-                bool success = false;
+                bool? success;
+
                 try {
                   if (item != null) {
                     int id = int.parse(item['id'].toString());
@@ -226,12 +235,14 @@ class _ClassesScreenState extends State<ClassesScreen> {
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
                       content: Text(
-                        success ? (item != null ? "Updated!" : "Created!") : "Failed",
+                        success == true
+                            ? (item != null ? "Updated!" : "Created!")
+                            : "Failed",
                       ),
                     ),
                   );
 
-                  if (success) fetchData();
+                  if (success == true) fetchData();
                 } catch (e) {
                   Navigator.pop(context);
                 }

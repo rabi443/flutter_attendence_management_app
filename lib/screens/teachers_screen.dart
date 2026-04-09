@@ -41,8 +41,14 @@ class _TeachersScreenState extends State<TeachersScreen> {
   @override
   void initState() {
     super.initState();
-    checkInternet();
-    fetchData();
+    init();
+  }
+
+  Future<void> init() async {
+    await checkInternet();
+    if (isConnected) {
+      await fetchData();
+    }
   }
 
   Future<void> checkInternet() async {
@@ -142,7 +148,7 @@ class _TeachersScreenState extends State<TeachersScreen> {
     }
 
     int parsedId = int.parse(id.toString());
-    bool success = false;
+    bool? success;
 
     try {
       success = await handleApi(
@@ -155,19 +161,17 @@ class _TeachersScreenState extends State<TeachersScreen> {
 
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-          content:
-          Text(success ? "Deleted successfully" : "Failed to delete")),
+        content: Text(success == true ? "Deleted successfully" : "Failed to delete"),
+      ),
     );
 
-    if (success) fetchData();
+    if (success == true) fetchData();
   }
 
   void openForm({Map<String, dynamic>? item}) {
     final formKey = GlobalKey<FormState>();
-
     Map<String, dynamic> formData = {};
 
-    // ✅ Extract data properly for edit
     if (item != null) {
       formData = {
         "name": item['user']?['name'] ?? '',
@@ -197,8 +201,7 @@ class _TeachersScreenState extends State<TeachersScreen> {
                       border: const OutlineInputBorder(),
                     ),
                     onSaved: (val) => formData[k] = val,
-                    validator: (val) =>
-                    val == null || val.isEmpty ? 'Required' : null,
+                    validator: (val) => val == null || val.isEmpty ? 'Required' : null,
                   ),
                 );
               }).toList(),
@@ -216,12 +219,12 @@ class _TeachersScreenState extends State<TeachersScreen> {
               if (formKey.currentState!.validate()) {
                 formKey.currentState!.save();
 
-                bool success = false;
+                bool? success;
+
                 try {
                   if (item != null) {
                     int id = int.parse(item['id'].toString());
 
-                    // ✅ IMPORTANT: send nested structure if API expects it
                     Map<String, dynamic> payload = {
                       "name": formData['name'],
                       "email": formData['email'],
@@ -244,14 +247,14 @@ class _TeachersScreenState extends State<TeachersScreen> {
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
                       content: Text(
-                        success
+                        success == true
                             ? (item != null ? "Updated!" : "Created!")
                             : "Failed",
                       ),
                     ),
                   );
 
-                  if (success) fetchData();
+                  if (success == true) fetchData();
                 } catch (e) {
                   Navigator.pop(context);
                 }

@@ -85,7 +85,7 @@ class _LoginScreenState extends State<LoginScreen> {
     setState(() => loading = true);
 
     var result = await ApiService.login(
-      email.text,
+      email.text.trim(),
       password.text,
       rememberMe,
     );
@@ -94,8 +94,15 @@ class _LoginScreenState extends State<LoginScreen> {
 
     if (result != null) {
       SharedPreferences prefs = await SharedPreferences.getInstance();
+
       await prefs.setString('token', result['token']);
       await prefs.setBool('rememberMe', rememberMe);
+
+      // 🔥 IMPORTANT FIX
+      await prefs.setInt(
+        'loginTime',
+        DateTime.now().millisecondsSinceEpoch,
+      );
 
       Navigator.pushReplacement(
         context,
