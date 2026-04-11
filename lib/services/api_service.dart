@@ -133,19 +133,77 @@ class ApiService {
   }
 
   // ➕ CREATE
+  // static Future<bool> createData(
+  //     String endpoint, Map<String, dynamic> data) async {
+  //   final response = await http.post(
+  //     Uri.parse("$baseUrl/$endpoint"),
+  //     headers: await getHeaders(isJson: true),
+  //     body: jsonEncode(data),
+  //   );
+  //
+  //   if (response.statusCode == 401) {
+  //     throw UnauthorizedException();
+  //   }
+  //
+  //   return response.statusCode == 201;
+  // }
+
   static Future<bool> createData(
       String endpoint, Map<String, dynamic> data) async {
+
     final response = await http.post(
       Uri.parse("$baseUrl/$endpoint"),
       headers: await getHeaders(isJson: true),
       body: jsonEncode(data),
     );
 
+    print("📡 STATUS: ${response.statusCode}");
+    print("📡 BODY: ${response.body}");
+
     if (response.statusCode == 401) {
       throw UnauthorizedException();
     }
 
-    return response.statusCode == 201;
+    final body = jsonDecode(response.body);
+
+    if (response.statusCode == 200 || response.statusCode == 201) {
+      return true;
+    }
+
+    return false;
+  }
+
+  //Mark Attendance
+  static Future<Map<String, dynamic>> saveAttendance(
+      String endpoint, Map<String, dynamic> data) async {
+
+    final response = await http.post(
+      Uri.parse("$baseUrl/$endpoint"),
+      headers: await getHeaders(isJson: true),
+      body: jsonEncode(data),
+    );
+
+    print("📡 STATUS: ${response.statusCode}");
+    print("📡 BODY: ${response.body}");
+
+    if (response.statusCode == 401) {
+      throw UnauthorizedException();
+    }
+
+    final body = jsonDecode(response.body);
+
+    if (response.statusCode == 200 || response.statusCode == 201) {
+      return {
+        "success": true,
+        "message": body['message'] ?? "Success"
+      };
+    }
+
+    return {
+      "success": false,
+      "message": body['message'] ?? "Failed",
+      "error": body['error'] ?? ""
+    };
   }
 
   // ✏️ UPDATE
