@@ -15,14 +15,20 @@ class StudentsScreen extends StatefulWidget {
   });
 
   @override
-  _StudentsScreenState createState() => _StudentsScreenState();
+  State<StudentsScreen> createState() => _StudentsScreenState();
 }
 
 class _StudentsScreenState extends State<StudentsScreen> {
   List<dynamic> data = [];
   List<dynamic> filteredData = [];
 
-  bool loading = true;
+  List<dynamic> classes = [];
+  List<dynamic> sections = [];
+
+  dynamic selectedClassId;
+  dynamic selectedSectionId;
+  String? selectedGender;
+
   bool isConnected = true;
   bool isUnauthorized = false;
 
@@ -32,246 +38,117 @@ class _StudentsScreenState extends State<StudentsScreen> {
   TextEditingController searchController = TextEditingController();
 
   List<String> get tableHeaders {
-    if (widget.endpoint == 'students') {
-      return ["ID", "Name", "Email", "Role", "Action"];
-    }
-    return ["ID", "Name", "Email", "Actions"];
+    return ["ID", "Name", "Email", "Role", "Gender", "Action"];
   }
 
   @override
   void initState() {
     super.initState();
-    init();
+    checkInternet();
+    fetchClasses();
+    fetchData();
   }
 
-  Future<void> init() async {
-    await checkInternet();
-    if (isConnected) {
-      await fetchData();
-    }
-  }
-
+  // ---------------- INTERNET ----------------
   Future<void> checkInternet() async {
-    var connectivityResult = await Connectivity().checkConnectivity();
-    bool nowConnected = connectivityResult != ConnectivityResult.none;
-    setState(() => isConnected = nowConnected);
-
-    if (!nowConnected) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text("No Internet Connection ❌"),
-          backgroundColor: Colors.red,
-        ),
-      );
-    }
+    var result = await Connectivity().checkConnectivity();
+    setState(() {
+      isConnected = result != ConnectivityResult.none;
+    });
   }
 
-  Future<void> refreshPage() async {
-    await checkInternet();
-    if (isConnected) await fetchData();
+  // ---------------- CLASSES ----------------
+  Future<void> fetchClasses() async {
+    final res = await handleApi(
+      context,
+          () => ApiService.getData("classes"),
+    );
+
+    setState(() {
+      classes = res ?? [];
+    });
   }
 
+  // ---------------- SECTIONS ----------------
+  Future<void> fetchSections(dynamic classId) async {
+    setState(() {
+      sections = [];
+      selectedSectionId = null;
+    });
+
+    final res = await handleApi(
+      context,
+          () => ApiService.getData("classes/$classId/sections"),
+    );
+
+    setState(() {
+      sections = res ?? [];
+    });
+  }
+
+  // ---------------- FETCH DATA ----------------
   Future<void> fetchData() async {
-    setState(() => loading = true);
-    if (!isConnected) {
-      setState(() => loading = false);
-      return;
-    }
+    if (!isConnected) return;
 
     try {
+      List<String> params = [];
+
+      if (selectedClassId != null) {
+        params.add("class_id=$selectedClassId");
+      }
+
+      if (selectedSectionId != null) {
+        params.add("section_id=$selectedSectionId");
+      }
+
+      if (selectedGender != null && selectedGender!.isNotEmpty) {
+        params.add("gender=$selectedGender");
+      }
+
+      String url = widget.endpoint;
+      if (params.isNotEmpty) {
+        url += "?${params.join("&")}";
+      }
+
       final result = await handleApi(
         context,
-            () => ApiService.getData(widget.endpoint),
+            () => ApiService.getData(url),
       );
 
       setState(() {
         data = result ?? [];
         filteredData = data;
-        loading = false;
         currentPage = 1;
       });
     } catch (e) {
-      setState(() => loading = false);
       if (e is UnauthorizedException) {
         setState(() => isUnauthorized = true);
-        return;
       }
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Failed to fetch data")),
-      );
     }
   }
 
+  // ---------------- SEARCH ----------------
   void filterData(String query) {
-    if (query.isEmpty) {
-      setState(() => filteredData = data);
-    } else {
-      setState(() {
-        filteredData = data
-            .where((item) => item.values.any(
-                (v) => v.toString().toLowerCase().contains(query.toLowerCase())))
-            .toList();
-        currentPage = 1;
-      });
-    }
+    setState(() {
+      filteredData = data.where((item) {
+        return item.values.any((v) =>
+            v.toString().toLowerCase().contains(query.toLowerCase()));
+      }).toList();
+      currentPage = 1;
+    });
   }
 
-  void confirmDelete(dynamic id) async {
-    bool confirm = await showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text("Confirm Delete"),
-        content: const Text("Are you sure you want to delete this item?"),
-        actions: [
-          TextButton(
-              onPressed: () => Navigator.pop(context, false),
-              child: const Text("Cancel")),
-          ElevatedButton(
-            onPressed: () => Navigator.pop(context, true),
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-            child: const Text("Delete"),
-          ),
-        ],
-      ),
-    ) ??
-        false;
-
-    if (confirm) deleteItem(id);
-  }
-
-  void deleteItem(dynamic id) async {
-    if (!isConnected) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("No Internet Connection")),
-      );
-      return;
-    }
-
-    int parsedId = int.parse(id.toString());
-    bool? success;
-
-    try {
-      success = await handleApi(
-        context,
-            () => ApiService.deleteData(widget.endpoint, parsedId),
-      );
-    } catch (e) {
-      success = false;
-    }
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content:
-        Text(success == true ? "Deleted successfully" : "Failed to delete"),
-      ),
-    );
-
-    if (success == true) fetchData();
-  }
-
-  void openForm({Map<String, dynamic>? item}) {
-    final formKey = GlobalKey<FormState>();
-
-    Map<String, dynamic> formData = {};
-
-    // ✅ Auto-fill from nested user
-    if (item != null) {
-      formData = {
-        "name": item['user']?['name'] ?? '',
-        "email": item['user']?['email'] ?? '',
-        "role": item['user']?['role'] ?? '',
-      };
-    }
-
-    List<String> allowedFields = ["name", "email", "role"];
-
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text(item != null ? "Edit Student" : "Add Student"),
-        content: SingleChildScrollView(
-          child: Form(
-            key: formKey,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: allowedFields.map((k) {
-                return Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 8),
-                  child: TextFormField(
-                    initialValue: formData[k]?.toString() ?? '',
-                    decoration: InputDecoration(
-                      labelText: k,
-                      border: const OutlineInputBorder(),
-                    ),
-                    onSaved: (val) => formData[k] = val,
-                    validator: (val) =>
-                    val == null || val.isEmpty ? 'Required' : null,
-                  ),
-                );
-              }).toList(),
-            ),
-          ),
-        ),
-        actions: [
-          TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text("Cancel")),
-          ElevatedButton(
-            onPressed: () async {
-              if (!isConnected) return;
-
-              if (formKey.currentState!.validate()) {
-                formKey.currentState!.save();
-
-                bool? success;
-
-                try {
-                  if (item != null) {
-                    int id = int.parse(item['id'].toString());
-                    success = await handleApi(
-                      context,
-                          () => ApiService.updateData(widget.endpoint, id, formData),
-                    );
-                  } else {
-                    success = await handleApi(
-                      context,
-                          () => ApiService.createData(widget.endpoint, formData),
-                    );
-                  }
-
-                  Navigator.pop(context);
-
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text(
-                        success == true
-                            ? (item != null ? "Updated!" : "Created!")
-                            : "Failed",
-                      ),
-                    ),
-                  );
-
-                  if (success == true) fetchData();
-                } catch (e) {
-                  Navigator.pop(context);
-                }
-              }
-            },
-            child: const Text("Submit"),
-          ),
-        ],
-      ),
-    );
-  }
-
+  // ---------------- UI ----------------
   @override
   Widget build(BuildContext context) {
-    if (isUnauthorized) return const SizedBox();
+    int totalPages = (filteredData.length / perPage).ceil().clamp(1, 999);
 
-    int totalPages = (filteredData.length / perPage).ceil();
     int start = (currentPage - 1) * perPage;
-    int end = (start + perPage > filteredData.length) ? filteredData.length : start + perPage;
-    List<dynamic> pageData = filteredData.sublist(start, end);
+    int end = (start + perPage > filteredData.length)
+        ? filteredData.length
+        : start + perPage;
+
+    List pageData = filteredData.sublist(start, end);
 
     return Scaffold(
       appBar: AppBar(
@@ -279,92 +156,173 @@ class _StudentsScreenState extends State<StudentsScreen> {
         backgroundColor: Colors.deepPurple,
       ),
       drawer: const AppDrawer(),
-      body: RefreshIndicator(
-        onRefresh: refreshPage,
-        child: ListView(
-          padding: const EdgeInsets.all(16), // padding around everything
-          children: [
-            if (!isConnected)
-              const Text("No Internet Connection", style: TextStyle(color: Colors.red)),
-            const SizedBox(height: 10),
-            TextField(
-              controller: searchController,
-              decoration: const InputDecoration(
-                hintText: "Search...",
-                prefixIcon: Icon(Icons.search),
-                border: OutlineInputBorder(),
-              ),
-              onChanged: filterData,
-            ),
-            const SizedBox(height: 16),
+      body: ListView(
+        padding: const EdgeInsets.all(16),
+        children: [
 
-            // Table with horizontal scroll
-            SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              child: DataTable(
-                columns: tableHeaders.map((header) => DataColumn(label: Text(header))).toList(),
-                rows: pageData.isEmpty
-                    ? [
-                  DataRow(
-                    cells: [
-                      DataCell(Text("No records available", style: TextStyle(color: Colors.grey))),
-                      ...List.generate(tableHeaders.length - 1, (_) => DataCell.empty),
-                    ],
-                  )
-                ]
-                    : pageData.map((item) {
-                  return DataRow(
-                    cells: [
-                      DataCell(Text(item['id'].toString())),
-                      DataCell(Text(item['user']?['name'] ?? '')),
-                      DataCell(Text(item['user']?['email'] ?? '')),
-                      if (widget.endpoint == 'students') DataCell(Text(item['user']?['role'] ?? '')),
-                      DataCell(
-                        SizedBox(
-                          width: 100, // fixed width for the cell
-                          child: Row(
-                            // mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              IconButton(icon: const Icon(Icons.edit), onPressed: () => openForm(item: item)),
-                              IconButton(icon: const Icon(Icons.delete), onPressed: () => confirmDelete(item['id'])),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ],
-                  );
-                }).toList(),
-              ),
-            ),
+          if (!isConnected)
+            const Text("No Internet", style: TextStyle(color: Colors.red)),
 
-            const SizedBox(height: 16),
+          const SizedBox(height: 10),
 
-            // Pagination buttons
-            if (totalPages > 1) ...[
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  ElevatedButton(
-                    onPressed: currentPage > 1 ? () => setState(() => currentPage--) : null,
-                    child: const Text("Previous"),
+          // ================= FILTER ROW =================
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: [
+
+                // SEARCH
+                SizedBox(
+                  width: 250,
+                  child: TextField(
+                    controller: searchController,
+                    decoration: const InputDecoration(
+                      hintText: "Search...",
+                      border: OutlineInputBorder(),
+                      prefixIcon: Icon(Icons.search),
+                      isDense: true,
+                    ),
+                    onChanged: filterData,
                   ),
-                  const SizedBox(width: 20),
-                  Text("Page $currentPage of $totalPages"),
-                  const SizedBox(width: 20),
-                  ElevatedButton(
-                    onPressed: currentPage < totalPages ? () => setState(() => currentPage++) : null,
-                    child: const Text("Next"),
+                ),
+
+                const SizedBox(width: 10),
+
+                // CLASS
+                SizedBox(
+                  width: 150,
+                  child: DropdownButtonFormField(
+                    value: selectedClassId,
+                    hint: const Text("Class"),
+                    isExpanded: true,
+                    decoration: const InputDecoration(
+                      border: OutlineInputBorder(),
+                      isDense: true,
+                    ),
+                    items: classes.map<DropdownMenuItem>((c) {
+                      return DropdownMenuItem(
+                        value: c['id'],
+                        child: Text(c['class_name'] ?? ''),
+                      );
+                    }).toList(),
+                    onChanged: (val) async {
+                      setState(() {
+                        selectedClassId = val;
+                        selectedSectionId = null;
+                      });
+
+                      await fetchSections(val);
+                      await fetchData();
+                    },
                   ),
-                ],
-              ),
-              const SizedBox(height: 50), // extra spacing at bottom
-            ],
-          ],
-        ),
-      ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () => openForm(),
-        child: const Icon(Icons.add),
+                ),
+
+                const SizedBox(width: 10),
+
+                // SECTION
+                SizedBox(
+                  width: 150,
+                  child: DropdownButtonFormField(
+                    value: selectedSectionId,
+                    hint: const Text("Section"),
+                    isExpanded: true,
+                    decoration: const InputDecoration(
+                      border: OutlineInputBorder(),
+                      isDense: true,
+                    ),
+                    items: sections.map<DropdownMenuItem>((s) {
+                      return DropdownMenuItem(
+                        value: s['id'],
+                        child: Text(s['section_name'] ?? ''),
+                      );
+                    }).toList(),
+                    onChanged: (val) async {
+                      setState(() {
+                        selectedSectionId = val;
+                      });
+
+                      await fetchData();
+                    },
+                  ),
+                ),
+
+                const SizedBox(width: 10),
+
+                // GENDER
+                SizedBox(
+                  width: 150,
+                  child: DropdownButtonFormField<String>(
+                    value: selectedGender,
+                    hint: const Text("Gender"),
+                    isExpanded: true,
+                    decoration: const InputDecoration(
+                      border: OutlineInputBorder(),
+                      isDense: true,
+                    ),
+                    items: const [
+                      DropdownMenuItem(value: "male", child: Text("Male")),
+                      DropdownMenuItem(value: "female", child: Text("Female")),
+                    ],
+                    onChanged: (val) async {
+                      setState(() {
+                        selectedGender = val;
+                      });
+
+                      await fetchData();
+                    },
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          const SizedBox(height: 16),
+
+          // ================= TABLE =================
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: DataTable(
+              columns: tableHeaders
+                  .map((h) => DataColumn(label: Text(h)))
+                  .toList(),
+              rows: pageData.isEmpty
+                  ? [
+                DataRow(
+                  cells: List.generate(
+                    tableHeaders.length,
+                        (i) => DataCell(
+                      i == 0
+                          ? const Text("No records",
+                          style: TextStyle(color: Colors.grey))
+                          : const Text(""),
+                    ),
+                  ),
+                )
+              ]
+                  : pageData.map((item) {
+                return DataRow(
+                  cells: [
+                    DataCell(Text("${item['id'] ?? ''}")),
+                    DataCell(Text(item['user']?['name'] ?? '')),
+                    DataCell(Text(item['user']?['email'] ?? '')),
+                    DataCell(Text(item['user']?['role'] ?? '')),
+                    DataCell(Text(item['gender'] ?? '')),
+                    DataCell(Row(
+                      children: [
+                        IconButton(
+                            icon: const Icon(Icons.edit),
+                            onPressed: () {}),
+                        IconButton(
+                            icon: const Icon(Icons.delete),
+                            onPressed: () {}),
+                      ],
+                    )),
+                  ],
+                );
+              }).toList(),
+            ),
+          ),
+        ],
       ),
     );
   }
